@@ -28,6 +28,7 @@ from rich import box
 from sentryip.agent import SentryIPAgent
 from sentryip.cache import cache
 from sentryip.config import settings
+from sentryip.fx import hacker_auth_sequence
 from sentryip.keymanager import configure_keys_interactive
 from sentryip.logging import logger
 from sentryip.models import FinalReport
@@ -351,6 +352,10 @@ def main():
     if args.keys:
         configure_keys_interactive()
         sys.exit(0)
+
+    # Fast hacker operator authentication sequence
+    if not args.json_mode and (not args.file or sys.stdin.isatty()):
+        hacker_auth_sequence()
 
     try:
         target_ip = args.ip
