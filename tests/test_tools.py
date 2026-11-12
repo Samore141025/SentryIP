@@ -41,6 +41,9 @@ async def test_shodan_internetdb_mocked():
 
 @pytest.mark.asyncio
 async def test_greynoise_riot_mocked():
+    from sentryip.cache import cache
+    cache.clear()
+
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.json.return_value = {

@@ -1,5 +1,6 @@
 """
-Interactive terminal UI, animated telemetry, and real-time execution dashboards for SentryIP.
+Interactive terminal UI, animated telemetry, Matrix cyber rain,
+and real-time execution dashboards for SentryIP.
 """
 
 from __future__ import annotations
@@ -27,23 +28,23 @@ from rich import box
 from sentryip.agent import SentryIPAgent
 from sentryip.cache import cache
 from sentryip.config import settings
+from sentryip.fx import matrix_rain_animation, hacker_auth_sequence
+from sentryip.keymanager import configure_keys_interactive
 from sentryip.logging import logger
 from sentryip.models import FinalReport
 from sentryip.report import render_report
 
 console = Console()
 
-BANNER = r"""[bold cyan]
-   _____            _              _____ _____  
-  / ____|          | |            |_   _|  __ \ 
- | (___   ___ _ __ | |_ _ __ _   _  | | | |__) |
-  \___ \ / _ \ '_ \| __| '__| | | | | | |  ___/ 
-  ____) |  __/ | | | |_| |  | |_| |_| |_| |     
- |_____/ \___|_| |_|\__|_|   \__, |_____|_|     
-                              __/ |             
-                             |___/              
-[/bold cyan][bold magenta]⚡ AUTONOMOUS SOC THREAT INTELLIGENCE AGENT ⚡[/bold magenta]
-[dim white]Production Passive Defense & Attack Surface Correlator[/dim white]
+BANNER = r"""[bold green]
+   ███████╗███████╗███╗   ██╗████████╗██████╗ ██╗   ██╗██╗██████╗ 
+   ██╔════╝██╔════╝████╗  ██║╚══██╔══╝██╔══██╗╚██╗ ██╔╝██║██╔══██╗
+   ███████╗█████╗  ██╔██╗ ██║   ██║   ██████╔╝ ╚████╔╝ ██║██████╔╝
+   ╚════██║██╔══╝  ██║╚██╗██║   ██║   ██╔══██╗  ╚██╔╝  ██║██╔═══╝ 
+   ███████║███████╗██║ ╚████║   ██║   ██║  ██║   ██║   ██║██║     
+   ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝╚═╝     
+[/bold green][bold cyan]⚡ AUTONOMOUS SOC THREAT INTELLIGENCE AGENT ⚡[/bold cyan]
+[dim white]Passive Threat Surface Defense • Zero-Touch Forensic Correlation[/dim white]
 """
 
 TOOL_DISPLAY_MAP = {
@@ -63,35 +64,35 @@ TOOL_DISPLAY_MAP = {
 def print_banner() -> None:
     console.print(BANNER)
     feeds = []
-    if settings.anthropic_api_key:
-        feeds.append("[bold green]Claude 3.5/Sonnet (LLM)[/bold green]")
+    if settings.gemini_api_key:
+        feeds.append("[bold green]Google Gemini (Brain)[/bold green]")
+    elif settings.anthropic_api_key:
+        feeds.append("[bold green]Claude 3.5 (Brain)[/bold green]")
     else:
-        feeds.append("[bold yellow]Autonomous Correlator (Zero-API-Cost Mode)[/bold yellow]")
+        feeds.append("[bold yellow]Autonomous Correlator[/bold yellow]")
+
+    if settings.vt_api_key:
+        feeds.append("[green]VirusTotal (Active)[/green]")
+    if settings.abuseipdb_api_key:
+        feeds.append("[green]AbuseIPDB (Active)[/green]")
 
     feeds.append("[cyan]RDAP/Whois[/cyan]")
     feeds.append("[cyan]Shodan InternetDB[/cyan]")
     feeds.append("[cyan]GreyNoise RIOT[/cyan]")
     feeds.append("[cyan]Tor & Feodo Feeds[/cyan]")
 
-    if settings.abuseipdb_api_key:
-        feeds.append("[green]AbuseIPDB[/green]")
-    if settings.vt_api_key:
-        feeds.append("[green]VirusTotal[/green]")
-    if settings.otx_api_key:
-        feeds.append("[green]AlienVault OTX[/green]")
-
     feed_line = " • ".join(feeds)
     console.print(Panel(
-        f"[bold white]Active Feeds:[/bold white] {feed_line}\n"
-        f"[bold white]Cache TTL:[/bold white] {settings.cache_ttl_hours}h SQLite | "
-        f"[bold white]Defense Policy:[/bold white] [bold green]Strictly Passive (Zero Port Scanning)[/bold green]",
+        f"[bold white]Intelligence Feeds:[/bold white] {feed_line}\n"
+        f"[bold white]Defense Policy:[/bold white] [bold green]Strictly Passive (Zero Port Scanning)[/bold green] | "
+        f"[bold white]Commands:[/bold white] [cyan]keys[/cyan] (configure keys) | [red]exit[/red] / [red]quit[/red] (exit)",
         border_style="bright_blue",
         box=box.ROUNDED,
     ))
 
 
 def get_public_ip() -> Optional[str]:
-    """Auto-detect current machine's external public IP."""
+    """Auto-detect current host's external public IP."""
     try:
         req = urllib.request.Request("https://api.ipify.org?format=json", headers={"User-Agent": "SentryIP/1.0"})
         with urllib.request.urlopen(req, timeout=3.0) as resp:
@@ -179,7 +180,6 @@ async def run_investigation_with_animation(
             elif result.get("error"):
                 animator.update_tool(tool_name, "Failed", result.get("error", "Failed"))
             else:
-                # Format friendly detail
                 summary = ""
                 if tool_name == "validate_ip":
                     summary = f"{result.get('version', '')} {result.get('ip_type', '')}"
@@ -217,13 +217,12 @@ async def run_investigation_with_animation(
 
         report = await agent.investigate(ip)
 
-        # If investigation stopped early (e.g. private IP RFC1918), mark remaining queued tools as Skipped (Non-public IP)
+        # If non-public IP stopped early, mark remaining feeds clearly
         if report.ip_type != "public":
             for tool_key in TOOL_DISPLAY_MAP.keys():
                 if animator.statuses.get(tool_key) == "Pending":
                     animator.update_tool(tool_key, "Skipped", f"N/A ({report.ip_type.value.upper()} address)")
 
-        # Small delay so user visually sees complete state
         live.update(animator.generate_dashboard())
         await asyncio.sleep(0.4)
 
@@ -248,22 +247,30 @@ def handle_report_output(
 
 
 async def interactive_repl(verbose: bool = False, no_cache: bool = False) -> None:
-    """Continuous SOC interactive terminal."""
+    """Continuous SOC interactive terminal with clean exit & key management."""
     print_banner()
 
     my_ip = get_public_ip()
-    tip = f"[dim white]💡 Tip: Press Enter to analyze your own public IP ([bold cyan]{my_ip}[/bold cyan]), or type any target IP.[/dim white]\n" if my_ip else ""
-    console.print(tip)
+    if my_ip:
+        console.print(f"[dim white]💡 Auto-detected external IP: [bold cyan]{my_ip}[/bold cyan] (Press Enter to analyze, or type any target)[/dim white]")
+    console.print("[dim]Type [bold red]'exit'[/bold red] to close, or [bold cyan]'keys'[/bold cyan] to configure API keys.\n[/dim]")
 
     while True:
         try:
-            prompt_str = f"[bold cyan]sentryip[/bold cyan] [dim]({my_ip or 'target'})[/dim] >"
+            prompt_str = f"[bold green]sentryip[/bold green] [dim]({my_ip or 'target'})[/dim] >"
             user_input = Prompt.ask(prompt_str, default=my_ip or "")
             clean = user_input.strip()
 
-            if clean.lower() in ["exit", "quit", "q"]:
-                console.print("[bold green]Goodbye![/bold green]")
+            # Clean exit handling
+            if clean.lower() in ["exit", "quit", "q", "bye"]:
+                console.print(Panel("[bold green]✔ SentryIP session terminated safely. Goodbye, Analyst.[/bold green]", border_style="green"))
                 break
+
+            # In-terminal key manager
+            if clean.lower() in ["keys", "key", "config", "configure"]:
+                configure_keys_interactive()
+                print_banner()
+                continue
 
             if not clean:
                 continue
@@ -272,7 +279,7 @@ async def interactive_repl(verbose: bool = False, no_cache: bool = False) -> Non
             handle_report_output(report, json_mode=False)
 
         except (KeyboardInterrupt, EOFError):
-            console.print("\n[bold yellow]Session cancelled by user. Exiting.[/bold yellow]")
+            console.print("\n[bold yellow]Session cancelled by user. Exiting safely.[/bold yellow]")
             break
         except Exception as e:
             console.print(f"[bold red]Investigation error: {e}[/bold red]")
@@ -288,6 +295,16 @@ def parse_args() -> argparse.Namespace:
         nargs="?",
         default=None,
         help="Target IP address for immediate autonomous investigation",
+    )
+    parser.add_argument(
+        "--matrix",
+        action="store_true",
+        help="Display cool hacker matrix binary rain animation on launch",
+    )
+    parser.add_argument(
+        "--keys",
+        action="store_true",
+        help="Configure API keys directly from the terminal",
     )
     parser.add_argument(
         "-a", "--auto",
@@ -327,6 +344,16 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
+
+    # Terminal key configuration command
+    if args.keys:
+        configure_keys_interactive()
+        sys.exit(0)
+
+    # Optional hacker intro matrix effect
+    if args.matrix:
+        matrix_rain_animation(duration_seconds=2.2, speed=0.07)
+        hacker_auth_sequence()
 
     try:
         target_ip = args.ip
