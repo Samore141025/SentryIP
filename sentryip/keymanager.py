@@ -86,3 +86,4 @@ def configure_keys_interactive() -> None:
             console.print(f"[bold green]✔ Saved {key_name} to .env[/bold green]")
 
     console.print("\n[bold green]✔ Key configuration complete! SentryIP is ready.[/bold green]\n")
+
