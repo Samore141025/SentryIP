@@ -1,0 +1,21 @@
+# SentryIP Test IP Dataset
+# Format: IP # Category - Description
+
+# --- Category 1: Public Benign / Safe (Known Trusted Infrastructure) ---
+1.1.1.1 # SAFE - Cloudflare Anycast Public DNS resolver (Clean reputation, RIOT verified)
+8.8.8.8 # SAFE - Google Public Primary DNS (dns.google, AS15169)
+9.9.9.9 # SAFE - Quad9 Anycast secure recursive DNS (AS19281, dns.quad9.net)
+
+# --- Category 2: Public Suspicious / Known Tor Exit Nodes ---
+185.220.101.5 # SUSPICIOUS - Active public Tor exit node (Tor Project directory listed)
+185.220.101.7 # SUSPICIOUS - Tor Project relay & exit node in Germany (Zwiebelfreunde)
+
+# --- Category 3: Public Malicious / High Threat Feeds ---
+185.196.11.210 # MALICIOUS - Known malware delivery / automated brute-force scanner
+89.248.163.76  # MALICIOUS - Shodan/Censys flagged mass scanner / abuse feeder
+
+# --- Category 4: Private RFC1918 / Local Wi-Fi (Triggers Early SOC Safe Halt) ---
+192.168.1.1   # PRIVATE - RFC1918 Home router default gateway
+10.0.0.1      # PRIVATE - RFC1918 Enterprise internal LAN address
+172.27.236.33 # PRIVATE - RFC1918 Local Wi-Fi subnet address
+
