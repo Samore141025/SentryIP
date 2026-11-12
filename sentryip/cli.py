@@ -28,7 +28,6 @@ from rich import box
 from sentryip.agent import SentryIPAgent
 from sentryip.cache import cache
 from sentryip.config import settings
-from sentryip.fx import matrix_rain_animation, hacker_auth_sequence, MatrixRainStream
 from sentryip.keymanager import configure_keys_interactive
 from sentryip.logging import logger
 from sentryip.models import FinalReport
@@ -113,7 +112,6 @@ class AnimatedInvestigator:
         }
         self.details: Dict[str, str] = {}
         self.start_time = time.time()
-        self.rain = MatrixRainStream(cols=36, rows=2)
 
     def update_tool(self, name: str, status: str, detail: str = ""):
         self.statuses[name] = status
@@ -150,16 +148,13 @@ class AnimatedInvestigator:
             f"[dim]|[/dim]  [bold green]Autonomous Orchestration[/bold green]"
         )
 
-        rain_lines = self.rain.get_lines()
-
         return Panel(
             Group(
                 Text.from_markup(header),
-                rain_lines,
                 table,
             ),
-            title="[bold green]⚡ [MATRIX ACTIVE] Autonomous Pipeline in Progress...[/bold green]",
-            border_style="green",
+            title="[bold yellow]⚡ Autonomous Investigation Pipeline in Progress...[/bold yellow]",
+            border_style="yellow",
             box=box.ROUNDED,
         )
 
@@ -356,11 +351,6 @@ def main():
     if args.keys:
         configure_keys_interactive()
         sys.exit(0)
-
-    # Show hacker intro matrix effect by default when running interactive session
-    if args.matrix or (not args.ip and not args.file and not args.keys):
-        matrix_rain_animation(duration_seconds=2.0, speed=0.07)
-        hacker_auth_sequence()
 
     try:
         target_ip = args.ip
