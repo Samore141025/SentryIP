@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # SentryIP One-Line Automated Installer for Windows (PowerShell)
 # Usage: irm https://raw.githubusercontent.com/Samore141025/SentryIP/main/install.ps1 | iex
 # ==============================================================================

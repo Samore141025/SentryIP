@@ -2,11 +2,14 @@
 
 **Autonomous Blue Team / SOC Threat Intelligence AI Analyst**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![User Manual](https://img.shields.io/badge/docs-User%20Manual-brightgreen.svg)](MANUAL.md)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MITRE ATT&CK](https://img.shields.io/badge/MITRE-ATT%26CK-red.svg)](https://attack.mitre.org/)
 
 SentryIP is a terminal-based autonomous threat intelligence AI agent designed for SOC analysts, incident responders, and blue teamers. When provided with an IP address or CIDR range, SentryIP autonomously queries, cross-correlates, and synthesizes multi-source passive threat feeds using **Google Gemini** or **Claude** to produce full forensic reports, MITRE ATT&CK TTP maps, attack-surface topology graphs, ready-to-paste firewall containment rules, and verified verdicts: **`SAFE`**, **`SUSPICIOUS`**, or **`MALICIOUS`**.
+
+> 📖 **Looking for the complete operator handbook?** See the full [**MANUAL.md**](MANUAL.md) for every command, flag, workflow, and FAQ.
 
 ---
 
