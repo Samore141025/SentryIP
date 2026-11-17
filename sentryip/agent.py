@@ -259,6 +259,7 @@ class SentryIPAgent:
             "otx_pulses",
             "abuseipdb_check",
             "virustotal_ip",
+            "leak_and_paste_check",
         ]
 
         tool_results: Dict[str, Dict[str, Any]] = {"validate_ip": ip_classification}

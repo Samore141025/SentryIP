@@ -158,6 +158,26 @@ def render_report(report: FinalReport, target_console: Console = console) -> Non
             )
         )
 
+    # 5b. MITRE ATT&CK Mapping Table
+    if report.mitre_attack:
+        mitre_table = Table(box=box.SIMPLE_HEAVY, show_header=True, expand=True)
+        mitre_table.add_column("Technique ID", style="bold yellow", width=14)
+        mitre_table.add_column("Tactic", style="cyan", width=22)
+        mitre_table.add_column("Name", style="bold white", width=26)
+        mitre_table.add_column("Context / Observation", style="white")
+
+        for m in report.mitre_attack:
+            mitre_table.add_row(m.technique_id, m.tactic, m.name, m.description)
+
+        target_console.print(
+            Panel(
+                mitre_table,
+                title="[bold yellow]⚔️ MITRE ATT&CK TTP Mapping[/bold yellow]",
+                border_style="yellow",
+                box=box.ROUNDED,
+            )
+        )
+
     # 6. Analyst Reasoning & Blue Team Recommendations
     reasoning_text = Text()
     for idx, r in enumerate(report.reasoning, 1):

@@ -1,5 +1,5 @@
 """
-Pydantic data models for SentryIP structured tool inputs and final SOC reports.
+Pydantic data models for SentryIP structured tool inputs, MITRE mapping, and final SOC reports.
 """
 
 from __future__ import annotations
@@ -59,6 +59,13 @@ class ReputationFinding(BaseModel):
     severity: str = Field(default="info", description="Severity: info, low, medium, high, critical")
 
 
+class MitreTechnique(BaseModel):
+    technique_id: str = Field(description="MITRE ATT&CK ID e.g. T1110")
+    tactic: str = Field(description="MITRE Tactic e.g. Initial Access, Discovery")
+    name: str = Field(description="Technique Name e.g. Brute Force")
+    description: str = Field(description="Correlation context for this IP")
+
+
 class FinalReport(BaseModel):
     ip: str = Field(description="Target IP address investigated")
     ip_type: IPType = Field(description="Classification of the IP address")
@@ -72,6 +79,7 @@ class FinalReport(BaseModel):
     open_ports: List[int] = Field(default_factory=list, description="Passively identified open ports")
     vulns: List[str] = Field(default_factory=list, description="Associated CVEs or known vulnerabilities")
     reputation_findings: List[ReputationFinding] = Field(default_factory=list)
+    mitre_attack: List[MitreTechnique] = Field(default_factory=list, description="Mapped MITRE ATT&CK TTPs")
     reasoning: List[str] = Field(default_factory=list, description="Step-by-step SOC analyst chain of evidence")
     recommended_actions: List[str] = Field(default_factory=list, description="Concrete blue-team mitigation steps")
     tools_used: List[str] = Field(default_factory=list, description="List of tools successfully queried")
@@ -80,4 +88,3 @@ class FinalReport(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
         description="Investigation timestamp in UTC ISO format",
     )
-

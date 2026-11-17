@@ -1,6 +1,6 @@
 """
-Interactive terminal UI, animated telemetry, Matrix cyber rain,
-and real-time execution dashboards for SentryIP.
+Interactive terminal UI, animated telemetry, attack surface graph trees,
+and multi-mode execution dispatcher for SentryIP.
 """
 
 from __future__ import annotations
@@ -26,13 +26,19 @@ from rich.text import Text
 from rich import box
 
 from sentryip.agent import SentryIPAgent
+from sentryip.block_generator import format_block_script_output
 from sentryip.cache import cache
 from sentryip.config import settings
 from sentryip.fx import hacker_auth_sequence
+from sentryip.graph import build_attack_surface_tree
+from sentryip.html_report import export_report_to_html
 from sentryip.keymanager import configure_keys_interactive
 from sentryip.logging import logger
-from sentryip.models import FinalReport
+from sentryip.models import FinalReport, Verdict
 from sentryip.report import render_report
+from sentryip.subnet import scan_cidr_subnet
+from sentryip.watchdog import run_watchdog_loop
+from sentryip.webhook import send_webhook_alert
 
 console = Console()
 
@@ -58,6 +64,7 @@ TOOL_DISPLAY_MAP = {
     "shodan_internetdb": "Passive Attack Surface, Open Ports & Known CVEs",
     "tor_and_blocklist_check": "Tor Exit Node Directory & Botnet Feeds (Feodo/Spamhaus)",
     "otx_pulses": "AlienVault OTX Threat Pulses & Adversary Campaigns",
+    "leak_and_paste_check": "Dark Web & Pastebin Breach Leak Indicators",
 }
 
 
@@ -80,6 +87,7 @@ def print_banner() -> None:
     feeds.append("[cyan]Shodan InternetDB[/cyan]")
     feeds.append("[cyan]GreyNoise RIOT[/cyan]")
     feeds.append("[cyan]Tor & Feodo Feeds[/cyan]")
+    feeds.append("[cyan]Pastebin Leaks[/cyan]")
 
     feed_line = " • ".join(feeds)
     console.print(Panel(
@@ -150,10 +158,7 @@ class AnimatedInvestigator:
         )
 
         return Panel(
-            Group(
-                Text.from_markup(header),
-                table,
-            ),
+            Group(Text.from_markup(header), table),
             title="[bold yellow]⚡ Autonomous Investigation Pipeline in Progress...[/bold yellow]",
             border_style="yellow",
             box=box.ROUNDED,
@@ -208,6 +213,8 @@ async def run_investigation_with_animation(
                     summary = f"Malicious: {result.get('malicious_count', 0)} engines"
                 elif tool_name == "otx_pulses":
                     summary = f"Pulses: {result.get('pulse_count', 0)}"
+                elif tool_name == "leak_and_paste_check":
+                    summary = f"Pastes: {result.get('paste_matches_count', 0)}"
 
                 animator.update_tool(tool_name, "Done", summary)
 
@@ -227,7 +234,7 @@ async def run_investigation_with_animation(
                     animator.update_tool(tool_key, "Skipped", f"N/A ({report.ip_type.value.upper()} address)")
 
         live.update(animator.generate_dashboard())
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(0.3)
 
     return report
 
@@ -236,17 +243,42 @@ def handle_report_output(
     report: FinalReport,
     json_mode: bool = False,
     output_file: Optional[str] = None,
+    html_file: Optional[str] = None,
+    show_graph: bool = False,
+    generate_block: bool = False,
+    webhook_url: Optional[str] = None,
 ) -> None:
     json_data = report.model_dump_json(indent=2)
     if output_file:
         out_path = Path(output_file)
         out_path.write_text(json_data, encoding="utf-8")
-        console.print(f"[bold green]✔ Report saved successfully to {out_path.resolve()}[/bold green]")
+        console.print(f"[bold green]✔ JSON Report saved successfully to {out_path.resolve()}[/bold green]")
+
+    if html_file:
+        saved_path = export_report_to_html(report, html_file)
+        console.print(f"[bold green]✔ Executive HTML Forensic Briefing generated at {saved_path.resolve()}[/bold green]")
+
+    if webhook_url:
+        asyncio.run(send_webhook_alert(webhook_url, report))
+        console.print(f"[bold green]✔ Webhook notification dispatched to {webhook_url[:35]}...[/bold green]")
 
     if json_mode:
         print(json_data)
     else:
         render_report(report, console)
+
+        if show_graph:
+            tree = build_attack_surface_tree(report)
+            console.print(Panel(tree, title="[bold cyan]🌐 Attack Surface & Attribution Topology[/bold cyan]", border_style="cyan"))
+
+        if generate_block or report.verdict == Verdict.MALICIOUS:
+            script_block = format_block_script_output(report.ip)
+            console.print(Panel(
+                Text(script_block, style="bold red"),
+                title=f"[bold red]🛑 Active Containment / Firewall Commands: {report.ip}[/bold red]",
+                border_style="red",
+                box=box.ROUNDED,
+            ))
 
 
 async def interactive_repl(verbose: bool = False, no_cache: bool = False) -> None:
@@ -256,7 +288,7 @@ async def interactive_repl(verbose: bool = False, no_cache: bool = False) -> Non
     my_ip = get_public_ip()
     if my_ip:
         console.print(f"[dim white]💡 Auto-detected external IP: [bold cyan]{my_ip}[/bold cyan] (Press Enter to analyze, or type any target)[/dim white]")
-    console.print("[dim]Type [bold red]'exit'[/bold red] to close, or [bold cyan]'keys'[/bold cyan] to configure API keys.\n[/dim]")
+    console.print("[dim]Commands: [bold red]'exit'[/bold red] to close | [bold cyan]'keys'[/bold cyan] for key config | [bold yellow]'graph 8.8.8.8'[/bold yellow] for tree graph\n[/dim]")
 
     while True:
         try:
@@ -264,22 +296,30 @@ async def interactive_repl(verbose: bool = False, no_cache: bool = False) -> Non
             user_input = Prompt.ask(prompt_str, default=my_ip or "")
             clean = user_input.strip()
 
-            # Clean exit handling
             if clean.lower() in ["exit", "quit", "q", "bye"]:
                 console.print(Panel("[bold green]✔ SentryIP session terminated safely. Goodbye, Analyst.[/bold green]", border_style="green"))
                 break
 
-            # In-terminal key manager
             if clean.lower() in ["keys", "key", "config", "configure"]:
                 configure_keys_interactive()
                 print_banner()
+                continue
+
+            show_graph = False
+            if clean.lower().startswith("graph "):
+                show_graph = True
+                clean = clean.split()[1]
+
+            if "/" in clean:
+                # CIDR scan
+                await scan_cidr_subnet(clean, verbose=verbose, no_cache=no_cache)
                 continue
 
             if not clean:
                 continue
 
             report = await run_investigation_with_animation(clean, verbose=verbose, no_cache=no_cache)
-            handle_report_output(report, json_mode=False)
+            handle_report_output(report, json_mode=False, show_graph=show_graph)
 
         except (KeyboardInterrupt, EOFError):
             console.print("\n[bold yellow]Session cancelled by user. Exiting safely.[/bold yellow]")
@@ -297,12 +337,7 @@ def parse_args() -> argparse.Namespace:
         "ip",
         nargs="?",
         default=None,
-        help="Target IP address for immediate autonomous investigation",
-    )
-    parser.add_argument(
-        "--matrix",
-        action="store_true",
-        help="Display cool hacker matrix binary rain animation on launch",
+        help="Target IP address or CIDR range (e.g. 192.0.2.0/28) for autonomous investigation",
     )
     parser.add_argument(
         "--keys",
@@ -333,6 +368,41 @@ def parse_args() -> argparse.Namespace:
         help="Save final JSON report to specified file path",
     )
     parser.add_argument(
+        "--html",
+        dest="html_file",
+        default=None,
+        help="Generate standalone executive dark-mode HTML forensic briefing",
+    )
+    parser.add_argument(
+        "--graph",
+        action="store_true",
+        help="Render network attribution topology tree graph",
+    )
+    parser.add_argument(
+        "--generate-block-script",
+        action="store_true",
+        help="Output ready-to-paste firewall/EDR containment syntax (iptables, ufw, PowerShell, Cisco, AWS)",
+    )
+    parser.add_argument(
+        "--watch",
+        dest="watch_ip",
+        default=None,
+        help="Continuous monitoring watchdog daemon: polls IP periodically and alerts on verdict change",
+    )
+    parser.add_argument(
+        "--watch-interval",
+        dest="watch_interval",
+        type=int,
+        default=3600,
+        help="Polling interval in seconds for watchdog mode (default: 3600s / 1 hour)",
+    )
+    parser.add_argument(
+        "--webhook",
+        dest="webhook_url",
+        default=None,
+        help="Slack or Discord incoming webhook URL for automated SOC alerts",
+    )
+    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Show live tool execution details and intermediate responses",
@@ -353,6 +423,15 @@ def main():
         configure_keys_interactive()
         sys.exit(0)
 
+    # Watchdog Daemon mode
+    if args.watch_ip:
+        asyncio.run(run_watchdog_loop(
+            ip=args.watch_ip,
+            interval_seconds=args.watch_interval,
+            webhook_url=args.webhook_url,
+        ))
+        sys.exit(0)
+
     # Fast hacker operator authentication sequence
     if not args.json_mode and (not args.file or sys.stdin.isatty()):
         hacker_auth_sequence()
@@ -361,6 +440,11 @@ def main():
         target_ip = args.ip
         if args.auto or (not target_ip and not args.file and sys.stdin.isatty() is False):
             target_ip = get_public_ip()
+
+        # CIDR Subnet Range Scan
+        if target_ip and "/" in target_ip:
+            asyncio.run(scan_cidr_subnet(target_ip, verbose=args.verbose, no_cache=args.no_cache))
+            sys.exit(0)
 
         if args.file:
             path = Path(args.file)
@@ -371,11 +455,27 @@ def main():
             for idx, ip in enumerate(ips, 1):
                 console.print(f"\n[bold cyan][{idx}/{len(ips)}] Investigating {ip}...[/bold cyan]")
                 report = asyncio.run(run_investigation_with_animation(ip, verbose=args.verbose, no_cache=args.no_cache))
-                handle_report_output(report, json_mode=args.json_mode, output_file=args.output_file)
+                handle_report_output(
+                    report,
+                    json_mode=args.json_mode,
+                    output_file=args.output_file,
+                    html_file=args.html_file,
+                    show_graph=args.graph,
+                    generate_block=args.generate_block_script,
+                    webhook_url=args.webhook_url,
+                )
         elif target_ip:
             print_banner()
             report = asyncio.run(run_investigation_with_animation(target_ip, verbose=args.verbose, no_cache=args.no_cache))
-            handle_report_output(report, json_mode=args.json_mode, output_file=args.output_file)
+            handle_report_output(
+                report,
+                json_mode=args.json_mode,
+                output_file=args.output_file,
+                html_file=args.html_file,
+                show_graph=args.graph,
+                generate_block=args.generate_block_script,
+                webhook_url=args.webhook_url,
+            )
         else:
             asyncio.run(interactive_repl(verbose=args.verbose, no_cache=args.no_cache))
 

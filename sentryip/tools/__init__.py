@@ -15,6 +15,7 @@ from sentryip.tools.providers import (
     tor_and_blocklist_check,
     otx_pulses,
 )
+from sentryip.tools.leak_check import leak_and_paste_check
 
 __all__ = [
     "registry",
@@ -30,5 +31,5 @@ __all__ = [
     "shodan_internetdb",
     "tor_and_blocklist_check",
     "otx_pulses",
+    "leak_and_paste_check",
 ]
-

@@ -1,12 +1,13 @@
 """
 Heuristic fallback engine that synthesizes intelligence tool outputs into a FinalReport
 when an LLM API key is not configured, ensuring the agent always executes and produces
-a full verdict and report directly without error.
+a full verdict, MITRE TTPs, and report directly without error.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List
+from sentryip.mitre import map_mitre_ttps
 from sentryip.models import (
     FinalReport,
     Verdict,
@@ -42,6 +43,7 @@ def synthesize_deterministic_report(
     shodan = tool_results.get("shodan_internetdb", {})
     blocklist = tool_results.get("tor_and_blocklist_check", {})
     otx = tool_results.get("otx_pulses", {})
+    leak = tool_results.get("leak_and_paste_check", {})
 
     risk_score = 0
     confidence = 85
@@ -168,6 +170,16 @@ def synthesize_deterministic_report(
         ))
         reasoning.append(f"Correlated across {pulse_count} AlienVault OTX pulses.")
 
+    # 7. Leak & Pastebin check
+    if leak.get("has_leak_presence"):
+        risk_score += 15
+        findings.append(ReputationFinding(
+            source="Dark Web / Pastebin Feeds",
+            finding=f"Referenced in {leak.get('paste_matches_count')} public breach pastes or text dumps",
+            severity="medium",
+        ))
+        reasoning.append(f"Observed in public paste/breach dumps ({leak.get('paste_matches_count')} references).")
+
     # Clamp risk score
     risk_score = min(100, max(0, risk_score))
 
@@ -213,6 +225,17 @@ def synthesize_deterministic_report(
         timezone=geo.get("timezone"),
     )
 
+    # MITRE ATT&CK Mapping
+    mitre_ttps = map_mitre_ttps(
+        open_ports=open_ports,
+        vulns=vulns,
+        blocklist_data=blocklist,
+        abuse_data=abuse,
+        vt_data=vt,
+        otx_data=otx,
+        is_tor=is_tor,
+    )
+
     summary = (
         f"Passive threat intelligence assessment for {ip} completed with a verdict of {verdict.value} "
         f"(Risk Score: {risk_score}/100, Confidence: {confidence}%). "
@@ -237,9 +260,9 @@ def synthesize_deterministic_report(
         open_ports=open_ports,
         vulns=vulns,
         reputation_findings=findings,
+        mitre_attack=mitre_ttps,
         reasoning=reasoning,
         recommended_actions=actions,
         tools_used=tools_used,
         tools_skipped=tools_skipped,
     )
-
