@@ -43,14 +43,14 @@ from sentryip.webhook import send_webhook_alert
 console = Console()
 
 BANNER = r"""[bold green]
-   ███████╗███████╗███╗   ██╗████████╗██████╗ ██╗   ██╗██╗██████╗ 
-   ██╔════╝██╔════╝████╗  ██║╚══██╔══╝██╔══██╗╚██╗ ██╔╝██║██╔══██╗
-   ███████╗█████╗  ██╔██╗ ██║   ██║   ██████╔╝ ╚████╔╝ ██║██████╔╝
-   ╚════██║██╔══╝  ██║╚██╗██║   ██║   ██╔══██╗  ╚██╔╝  ██║██╔═══╝ 
-   ███████║███████╗██║ ╚████║   ██║   ██║  ██║   ██║   ██║██║     
-   ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝╚═╝     
-[/bold green][bold cyan]⚡ AUTONOMOUS SOC THREAT INTELLIGENCE AGENT ⚡[/bold cyan]
-[dim white]Passive Threat Surface Defense • Zero-Touch Forensic Correlation[/dim white]
+   ███████╗███████╗███╗   ██╗████████╗██████╗ ██╗   ██╗     ██╗██████╗ 
+   ██╔════╝██╔════╝████╗  ██║╚══██╔══╝██╔══██╗╚██╗ ██╔╝     ██║██╔══██╗
+   ███████╗█████╗  ██╔██╗ ██║   ██║   ██████╔╝ ╚████╔╝█████╗██║██████╔╝
+   ╚════██║██╔══╝  ██║╚██╗██║   ██║   ██╔══██╗  ╚██╔╝ ╚════╝██║██╔═══╝ 
+   ███████║███████╗██║ ╚████║   ██║   ██║  ██║   ██║        ██║██║     
+   ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝        ╚═╝╚═╝     
+[/bold green][bold red]⚡ SENTRY-I.P. // CYBER DEFENSE & THREAT INTELLIGENCE AGENT ⚡[/bold red]
+[dim white]Autonomous Attack Surface Interceptor • Passive SOC Intelligence[/dim white]
 """
 
 TOOL_DISPLAY_MAP = {
@@ -292,8 +292,8 @@ async def interactive_repl(verbose: bool = False, no_cache: bool = False) -> Non
 
     while True:
         try:
-            prompt_str = f"[bold green]sentryip[/bold green] [dim]({my_ip or 'target'})[/dim] >"
-            user_input = Prompt.ask(prompt_str, default=my_ip or "")
+            prompt_str = f"[bold red]☠ root@sentry-ip[/bold red]:[bold cyan]~/{my_ip or 'target'}[/bold cyan][bold yellow]# target-ip[/bold yellow]"
+            user_input = Prompt.ask(prompt_str, default=my_ip or "", show_default=False)
             clean = user_input.strip()
 
             if clean.lower() in ["exit", "quit", "q", "bye"]:
